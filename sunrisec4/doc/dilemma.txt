@@ -1,0 +1,94 @@
+(def bop :void ()
+   (let (a :int)
+        (b :int)
+	(ptr1 :^:int)
+	(ptr2 :^:int))
+   (set a 10)
+   (set b 20)
+   (set ptr1 a)      ; ptr1 = &a;    But how do you do *ptr1 = a??
+   (set ptr2 b)      ; ptr2 = &b;    
+   (set ptr1 ptr2)   ; ptr1 = ptr2;  But how do you do *ptr1 = *ptr2??
+   (set ptr1 10)     ; *ptr1 = 10;
+   (set a ptr1)      ; a = *ptr1;
+   )
+
+
+(struct foo
+   (a :int)
+   (b :int)
+   (c :^:foo))
+
+; It's concise, it's easy, and we have to deal with bloody operator
+; precedence!!!
+; Hmm... 
+; opfoo.bar #foo.1 .bar.item ^ptr &val
+; as opposed to 
+; (op foo bar) (# foo 1) (. bar item) (^ ptr) (& val)
+;
+; Well, (^ ptr) and (& val) won't kill one, they're just kinda annoying.
+(def bop2 :void ()
+   (let (a :int)
+        (b :int)
+	(ptr1 :^:int)
+	(ptr2 :^:int))
+   (set a 10)
+   (set b 20)
+   (set ptr1 &a)  
+   (set ptr2 &b)
+   (set ^ptr1 a)      
+   (set ptr1 ptr2)
+   (set ^ptr1 ^ptr2) 
+   (set ptr1 10)  ; Type error
+   (set ptr1 (cast :^:int 10))
+   (set a ^ptr1)
+   )
+
+
+; ...hmmmm.
+; ...how 'bout we flip the C way of doing things a bit, hmm?
+(let (a :int)
+     (b :int)
+     (c :^:int)
+     (d :^:int))
+
+C:
+(set c (& a))      ; Make c point at a
+(set (^ c) 10)     ; Set contents of c to 10
+(set a (^ c))      ; set a to contents of c
+
+Us:
+Basically, the ^ operator re-aims the pointer somewhere, PREVENTING a
+dereference.
+...and I don't really know how to program it, so fuckit, I'll go with the C
+style.
+(set (^ c) a)      ; Make b point at a
+(set c 10)         ; Set contents of c to 10
+(set a c)          ; Set contents of a to c
+
+; We basically make the ^ operator have the opposite meaning of C's *
+; Can we ditch NIL by making pointers and function vars always initialized?
+; Tempting...  Oh so tempting...
+; ...smeg it!  What about free'd pointers then?
+; Well, THEY aren't nil anyway.  They're undefined, errors.  So...
+;
+; Hrm.  So, do pointers syntactically have to be initialized?
+; Do ALL variables have to be initialized?  No, that's too much...
+; ...nulltype still exists, as functions that return nothing return
+; nulltype.  Null value on the other hand, doesn't.
+; ...erffuckit.  What about, say, pointers in structures or arrays???
+; THIS is a hard one, that OCaml doesn't really solve that well.
+; You either need tagged variants or a generic object type.
+; ...or the ability to initialize dynamic structures "instantly", in the
+; allocation call.
+; ...or just force the programmer to write their own type-specific null.
+; Yes.  That will WORK.  Worse is better.  A Real Solution will come about
+; with a stronger/more powerful type system. 
+; Except that structures don't have default values at the moment.
+(set (^ c) a)     ; c aims at a
+(set (^ d) b)     ; d aims at b
+(set (^ c) (^ d)) ; c now aims at b
+(set (^ c) d)     ; Illegal, type mismatch
+(set (^ c) b) ; c now aims at b
+(set c d)     ; Now a = b -copying
+(set c (^ d)) ; Illegal, type mismatch
+

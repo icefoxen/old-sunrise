@@ -1,0 +1,71 @@
+\documentclass[11pt]{article} 
+\usepackage[latin1]{inputenc} 
+\usepackage[T1]{fontenc} 
+\usepackage{fullpage} 
+\usepackage{url} 
+\usepackage{ocamldoc}
+\begin{document}
+\tableofcontents
+\section{Module {\tt{ErrorReport}}}
+\label{module:ErrorReport}\index{ErrorReport@\verb`ErrorReport`}
+
+
+\ocamldocvspace{0.5cm}
+
+
+
+\label{val:ErrorReport.lineNum}\begin{ocamldoccode}
+val lineNum : int Pervasives.ref
+\end{ocamldoccode}
+\index{lineNum@\verb`lineNum`}
+
+
+
+
+\label{val:ErrorReport.chrNum}\begin{ocamldoccode}
+val chrNum : int Pervasives.ref
+\end{ocamldoccode}
+\index{chrNum@\verb`chrNum`}
+
+
+
+
+\label{val:ErrorReport.fileName}\begin{ocamldoccode}
+val fileName : string Pervasives.ref
+\end{ocamldoccode}
+\index{fileName@\verb`fileName`}
+
+
+
+
+\label{val:ErrorReport.nl}\begin{ocamldoccode}
+val nl : unit -> unit
+\end{ocamldoccode}
+\index{nl@\verb`nl`}
+
+
+
+
+\label{val:ErrorReport.error}\begin{ocamldoccode}
+val error : string -> unit
+\end{ocamldoccode}
+\index{error@\verb`error`}
+
+
+
+
+\label{val:ErrorReport.errorAndDie}\begin{ocamldoccode}
+val errorAndDie : string -> 'a
+\end{ocamldoccode}
+\index{errorAndDie@\verb`errorAndDie`}
+
+
+
+
+\label{val:ErrorReport.reset}\begin{ocamldoccode}
+val reset : string -> unit
+\end{ocamldoccode}
+\index{reset@\verb`reset`}
+
+
+\end{document}

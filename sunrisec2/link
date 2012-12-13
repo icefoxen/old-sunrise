@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# This is a rather sucky way of doing this, but oh well.
+FILES="errorReport.cmo syntree.cmo parse.cmo lex.cmo \
+       sizes.ml symtbl.cmo semant.cmo main.cmo"
+
+OCAMLLINK=ocamlc.opt
+TARGET=sunrisec
+
+$OCAMLLINK -g -o $TARGET $FILES

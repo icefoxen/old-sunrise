@@ -1,0 +1,332 @@
+IDEAL systems language (what I want):
+(A * means GCC can do it pretty easily)
+*1) Transparent references
+*2) Explicit pointers
+*3) Recursive structures
+*4) Constructable structures (C99, OCaml)
+*5) GC (optional)
+*6) Detailed control over memory (contradicts #5?)
+*7) Explicit type sizes --int8 vs int16 vs int32
+*8) Strong typing (M2, Ocaml (NO VOID TYPE!))
+9) Flexible typing (Haskell typeclasses) (optional)
+*10) Bounds-checked arrays
+*11) Simple, consistant syntax (Lisp, Haskell, M3) (recursive-descent)
+*12) Capable, simple module system (M3, Java, Python, OCaml)
+*13) Mainly-inferred typing (OCaml, Haskell) (optional)
+*14) Array slices
+*15) Enumerations
+16) Tagged structures (OCaml)
+17) Parametric polymorphism (OCaml, Haskell, Eiffel) (optional)
+18) First-class functions, lambda (OCaml, Haskell, Lisp)
+*19) Inline asm
+20) Variable-length arguments
+*21) Labelled variables
+22) Multiple return values
+23) Lexical closures (requires GC?)
+*24) Exception handling
+*25) No uninitialized values
+26) Unicode strings by default
+*27) No forward declerations?  (Are they a good thing or a bad thing?)
+*28) C function interface (simpler the better)
+*29) Easy string manipulation (ranges, automatic concat, etc, see #5)
+*30) DEBUG statement that can be switched on or off at compile time
+*31) No seperate header files
+*32) Everything is an expression; assignment, loops and all
+*33) Pascal/Modula-ish sets?
+34) Structural equality (OCaml)
+*35) Default argument values
+*36) Able to set source-file line (C, OCaml)
+37) Sophisticated runtime compilation/linking (Smalltalk, Lisp, etc)
+38) Different modes for testing and distribution (see 30) (ie OCaml)
+
+BASIC systems language (fundamental principles):
+1) Transparent references
+2) Explicit pointers
+3) Recursive structures
+6) Detailed control over memory (contradicts #5?)
+7) Explicit type sizes --int8 vs int16 vs int32
+8) Strong typing (M2, Ocaml)
+10) Bounds-checked arrays
+11) Simple, consistant syntax (Lisp, Haskell, M3) (recursive-descent)
+18) First-class functions, lambda (OCaml, Haskell, Lisp)
+24) Exception handling
+25) No uninitialized values
+31) No seperate header files
+
+
+(import stdio)
+(fun main:int ()
+   (println "Hello world!")
+   0)
+
+(def fib:uint (x:uint)
+   (if (< x 2)
+      1
+      (+ (fib (- x 1)) (fib (- x 2)))))
+
+// How does one declare and <- variables nicely?
+(def beer:void ()
+   (from x:int 99 0 -1  // From x:int = 99 to 0 by -1
+      (printf "%d bottles of beer on the wall, %d bottles of beer!" x x)
+      (println "Take one down, pass it around,")
+      (println "%d bottles of beer on the wall!" (- x 1)))
+   (println "No more beer..."))
+
+// Default values are required
+(struct point
+   (x:int 0)
+   (y:int 0)
+   (z:int 0))
+
+// Tagged union
+// How many namespaces are we going to need for this, anyway?
+(union listnode
+   (NullNode)
+   (Node (item:listnode NullNode)
+         (next:listnode NullNode)))
+
+
+// Um.  This creates garbage.  >_>
+(def reverse:listnode (x:listnode)
+   (def reversehelper:listnode (x:listnode a:accm)
+      (if (= x.next {NullNode})   // {}'s specify a constructor?
+         (<- x.next a)
+	 (reversehelper x.next {Node node=x.item next=a})))
+   (reversehelper x {NullNode}))
+
+
+// ...Never mind the fact that this is supposed to be the Basic language,
+// which doesn't even have tagged unions.
+// Arrays, variables, exceptions, strings, pointers
+// Address type, a la M3?
+
+(def sum3:int (i1:int i2:int i3:int)
+   (let (res:int 0))
+   (<- res (+ i1 i2 i3))
+   res)
+
+(def concatArray:#int (a:#int b:#int)
+   (let (res:#int (create :#int (+ a.len b.len)))
+        (i1:int 0)
+	(i2:int 0))
+   (while (< i2 a.len)
+      (<- res#i1 a#i2)
+      (inc i1)
+      (inc i2))
+   (<- i2 0)
+   (while (< i2 res.len)
+      (<- res#i1 b#i2)
+      (inc i1)
+      (inc i2))
+   res)
+
+(type foomask int)
+
+(def swapPtr:void (a:^int b:^int)
+   (let (tmp:^int ^a))
+   (<- ^a ^b)
+   (<- ^b ^tmp))
+
+(def setPtr:void (a:^int)
+   (<- a (addr 10)))
+
+// "create" is an allocator thingy.
+(def map:#int (f:fun:int:int arr:#int)  // :fun:int:int is a compound type...
+   (let (res:#int (create :#int arr.len)))
+   (foreach x arr
+      (<- res#x (f arr#x)))
+   res)
+
+// ...Again, I kinda assume the presence of GC to handle the string I 
+// create...
+(def slurpFile:string (s:string)
+   (try
+      (let (f:File (fopen s 'r'))  // "let" creates things in the order given
+           (res:string (create :string (flength f))))
+      (foreach x res               // but string /= array...
+         (<- res#x (getc f)))
+      res
+   (with
+      ((FileDNE x) (printf "File %s does not exist; ignoring\n" x))
+      ((FileClosed x) (printf "File %s is suddenly shorter than I think it is\
+                               --corrupted?\n" x)))
+   (finally
+      (fclose f))))
+      
+
+// I kinda like this because, so far, the syntactic elements are VERY symple.
+// () symbols numbers : "" '' # ^ . and that's it.
+// the only "interesting" thing I can see so far would be function types...
+// And hmm, other compound types?  Parametric polymorphism, basically
+// I'm not sure my type-checking skillz are up to that kind of complexity,
+// but I can give it a go...
+
+(struct list:T
+   (car :T NIL)
+   (cdr :list:T NIL))
+
+(def cons:list:T (a:T b:list:T)
+   (let (l (create :list:T)))
+   (<- l.car a)
+   (<- l.cdr b)
+   l)
+
+// And I REALLY don't know whether or not GC is going to work here!
+// I should talk to someone who's an expert, if I can find 'em...
+//
+// ...hmm.  "create" could be a global symbol that various functions could
+// be assigned to...  Well, it can't be, quite, because it takes a type
+// as an argument.  But!, it can call a certain function to do the necessary
+// stuff.  So...
+
+// I want GC
+(import GC)
+(setAllocator gcAlloc)
+(let i (create :#int 100))  // GC'd memory
+(free i)                   // Does nothing
+
+// I don't want GC
+(import ManualMem)
+(setAllocator manualAlloc)
+(let i (create :#int 100)) // Non-GC'd memory
+(free i)                  // Free's i
+
+// The trick here, is if we do the first one, ALL instances of "create" call
+// gcAlloc, and ALL memory is garbage collected.  And ALL memory is non-GC'd
+// if we call the second one... which has the potential to MAJORLY fuck up
+// libraries that weren't created with that in mind.  So we force you to
+// act as if there is no GC, even if there almost always will be.  Shit.
+// Another problem HERE, is what happens when GC and non-GC memory interact?
+// Forbidding it might be nice, but they have to interact SOME time, so...
+
+
+Hmmm.  Two versions of the language?  Simple, non-GC SongLight, and heavy, GC
+Song?  The memory model would either be the same, or quite similar --passing
+objects from one to the other and back should be trivial.  Biggest issues for
+that:
+GC
+Typing
+Unicode strings (because SL would need to have them too)
+Tagged structures
+Module system
+Typeclasses?
+
+
+Exact references: References are laid out differently from non-refs, for
+instance they always are set first in a record or stack.
+Tagged blocks/arrays a la OCaml?  The only thing is, this can interfere with
+anything that has to worry about memory layout... well, so can the previous,
+really.
+CHECK M3 RUNTIME MODEL!!!  And Eiffel!!!
+Basically, if you're using GC, you can't PRECISELY control the memory
+representation of, well, anything really.
+
+...hmm.  Ideally, SongLight should be a DIRECT subset of Song, so you can port
+things with just a recompile.  That's probably the easiest method of FFI.  But
+they don't share a runtime, which is sorta inconvenient.  It can be worked
+around though.
+Basically, you want to be able to write Song's GC in SongLight.  Functions
+being inter-operable is easy, and... hmm, come to think of it, reworking
+structures and arrays would probably just be a matter of adding or stripping a
+few words of metadata.  So, doable.
+
+Well, unless you use exact references...  then you have to re-order
+everything!
+The thing is, how much does this memory-layout stuff matter to low-level
+programming?  Does it really matter THAT much if a structure's pointers are
+compacted to the front or something?  I mean, it means you can't use it to
+directly set up an interrupt table, but such things aren't really THAT much
+harder in assembly.
+
+In the same vein, should there be a "direct" type to augment the implicit
+usage of references?
+(struct list
+   (car:int 0)
+   (cdr:list NIL))
+
+This creates 2 memory cells: an int, and a pointer to a list.  The pointer is
+hidden behind the implicit reference; all compound types (structs, arrays,
+etc) are implicit references, just like Java.  So if it's:
+(struct foo
+   (a:int 0)
+   (b:#int [10,20,30]))
+This creates 2 cells also: an int, and a pointer to an int array.  Likewise,
+an array of foo's would be an array of pointers to foo's.  Do I need some way
+to write 
+(struct foo
+   (a:int 0)
+   (b:@#int [10,20,30]))
+and have b be a direct array?
+Maybe.  Complexity vs. flexibility vs. convenience.  Aargh.  The problem here
+is that foo's size is FIXED.  You cannot pull out that 3-element array and
+stick a 6-element array in instead.  Which means the compiler has to worry
+about how long the array is, and so on...
+
+GRR.  Lots of complexity for dubious return.  Leave it, for now.
+
+
+
+
+
+
+
+
+
+Okay.  I want a clear, consistant set of rules that let me tell how and when
+types should be implicitly expanded from a less-general to a more-general
+type.  Shortly, how to let me pass an int8 to something that expects an int16.
+This should be done implicitly, and there should be explicit options to turn
+an int16 into an int8.  It would be nice if the solution could be generalized
+so I could use a range 1-10 where a range 0-20 is expected...
+So, my options:
+*Just make integers and floats Special, and let them be implictly converted,
+foo8 -> foo16 -> foo32 -> foo64.
+--Relatively simple, but requires some nasty, context-sensitive analysis of
+integer literals
+!!!  Use of archsize may help here!!
+*Just have two types, int and uint, like Modula-2.  Byte can be seperate.
+--Very very simple.  So simple it's very very attractive.  Just one problem.
+What if you want a fucking int16 or int64?
+*Let you specify various int-types of different bitsize and sign.
+--Very flexible.  Too flexible.  Too complicated.  Kinda silly.
+
+Signed vs unsigned is another issue.  Basically there are a few options... 
+*A uint8 can be an int16, a uint16 can be an int32, and so on
+--Guarentees no lossage, but is unwieldy and annoying and confusing
+*All uint-to-int and vice-versa needs a typecast statement
+--Makes sure the programmer notices, but can allow lossage.  Probably the best
+choice, since freedom to the programmer is good.
+
+Okay, here's another problem:
+(type foo :int)
+(def bop (a :foo)
+  ...)
+(bop 10)
+
+10 is an int, or an int variant, or so on.  But bop takes an arg of type :foo.
+One cannot be the other.
+
+...I'm tempted to just say fuckit and say Bliss and Forth have the right
+answers.  I'm sick of this strong-typing shit, but I'm not sure how to replace
+it.  Maybe I should look at D and Modula more...
+
+
+Gah.  This is simple.  Make some facility to cast types.
+(type foo :int)
+(def bop (a :foo)
+  ...)
+(bop (force :foo 10))
+
+Forbid casting types to pointers, a la
+(force :^:int 10)
+Or possibly allow it, and have the compiler print a warning along the lines of
+"either you know exactly what you're doing, or you don't have a clue".
+Eh, forbid it, and then have an "address" type in the next revision maybe.
+
+Numbers can be forced from one type to another.  At the moment they MUST be
+cast, though later on some implicit coercion may end up happening.
+Structures, arrays, and pointers may not be forced.  Other atomic values such
+as bools and chars can.  Appropriate conversion should be done where possible,
+such as sign extension and conversion of ints to floats and vice-versa.
+
+There.  Life is suddenly simple and safe.

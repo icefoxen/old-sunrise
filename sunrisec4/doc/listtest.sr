@@ -1,0 +1,36 @@
+/- listtest.sr
+   This is a test that looks at how things might work if references were
+   explicit, but dereferencing them was implicit.
+   ...it doesn't change behavior, just type declerations.  I think I might
+   be able to live with that...
+-/
+
+(struct lst
+   (itm :int)
+   (nxt :^:lst))
+
+(def cons :^:lst (a :int b :^:lst)
+   (let (ret :^:lst (alloc :lst)))
+   (<- ret.itm a)
+   (<- ret.lst b)
+   ret)
+
+(def copy :@:lst (list :@:lst)
+   (let (newlst :^:lst (alloc :lst)))
+   (<- newlst.itm list.itm)
+   (if (= list.lst NIL)
+      newlist
+      (<- newlist.lst (copy list.lst))))
+
+(def reverse :^:lst (list :^:lst)
+   (def helper :lst (oldlist :^:lst newlist :^:lst)
+      (if (= oldlist NIL)
+         newlist
+	 (helper oldlist.lst (cons oldlist.itm newlist))))
+   (helper list NIL))
+
+/- Then if you wanted to allocate a list node on the stack, you would just do
+   (let (newlst :lst))
+   and it's values would get initialized all nice-like...
+   Hrm.  I think I should really leave this for later.
+-/

@@ -1,0 +1,843 @@
+INTRO
+Okay.  This defines a light, nigh-minimal systems programming language.  By
+"nigh-minimal", I mean not as sophisticated as Objective Caml, so it really
+doesn't mean that much, probably.  I'm sure lots of people will laugh at me,
+or even say silly things like "what's wrong with C?", but oh well.
+For no particular reason, call this language...  Sunrise.
+Anyway.  The goal of this language is to take C and chop out all the
+30-year-old cruft and crap.  If you want a sophisticated applications- 
+programming language with all sorts of nice features, use C++ or Java or (my
+personal favorite and better than the other two put together) Objective Caml.
+If you want a nice scripting language with lots of string handling and
+built-in support for everything you'll ever need, use Python or Ruby.  If you
+want a language to write an operating system or compiler runtime or memory
+management system in, try this.  If it doesn't do a better job than C, tell
+me, and I'll fix it.
+This is a draft document, and a draft language, both unpolished and constantly
+under revision.  One of the goals of Sunrise is to define a base language to
+which various semi-experimental features can be added and played with.  Do
+note that after a phase of experimentation, a final language and specification
+will be devised.
+
+LEXICAL CONVENTIONS
+Identifiers are characters a-z, A-Z, 0-9, and underscore.  An identifier had
+better not start with a number.  Identifiers starting with an underscore can
+be defined, but are reserved for use by the compiler, runtime, and any other
+magical rituals necessary, so don't use them unless you know what you're
+doing.  Sunset is case-sensitive.
+
+Comments start with ; and continue to the end of the line.  Block comments
+start with /- and end with -/.  They may be nested.
+
+The following are reserved words and symbols:
+( ) : # ^ @ [ ] , . ' " set ; { } /- -/
+< > <= >= = /=
++ - * / % **
+if while for do
+let global const def type struct 
+NIL void
+and or not xor
+band bor bnot bxor << >> 
+
+Numbers can be written in a variety of ways.  The default is decimal.
+Numbers beginning with 0x, for example 0x91, are hexadecimal.  Numbers
+starting with 0o are octal, a la 0o77.  Numbers starting in 0b are binary;
+0b1011.
+
+Any number with a period in it is considered a floating point number, for
+example, 1 is an integer, 1.0 is a float.  These are not interchangable.
+XXX: At the moment there are no C-ish number-suffexes, such as 1.0f or
+1234567890L.  These may happen later.
+
+Characters are enclosed by single-quotes (').  Characters must be straight
+ASCII; Unicode strings will probably be provided later through libraries.  A
+character can be defined by a \ followed by a number; for instance '\40',
+'\0x40', '0b10', or '\0o40'.  The special sequences \n, \r, \b, and \t
+represent a newline, carriage return, backspace and tab respectively.
+
+Strings are enclosed by double-quotes.  They can contain all the escape
+sequences characters have.
+
+An array literal is a list of values (no variables allowed) enclosed by
+curly-braces ({ and }) and seperated by spaces.  All the values must be the
+same type.
+
+VALUES AND TYPES
+Sunset is more or less strongly typed.  Since there is a different type of
+number for each possible size and signedness, really strict typing isn't
+practical.
+Basically, how it works is thus: There are two kinds of types, atomic and
+compound.  Atomic types are numbers, characters and pointers.  Compound types
+are arrays and structures and functions.  Any atomic type may be cast to be
+another atomic type (though doing so with pointers is insane, dangerous, and
+insanely dangerous).  No compound type may be cast to other types.
+There is no type inference.  There is no object system, though there MAY be
+later.  There is no parametric polymorphism, though there SHOULD be later.  
+
+The basic, atomic types are thus:
+:int8
+:uint8
+:int16
+:uint16
+:int32
+:uint32
+:int64
+:uint64
+:float32
+:float64
+:^ (pointer)
+:void
+
+The number suffix denotes the number of bits the type uses.  A "u" prefix
+denotes that it is an unsigned integer.  These exist to make it utterly clear
+what exact type you are using, no matter what compiler or platform.  These
+types can be altered/extended if special values MUST be included, ie int128
+and uint128 types for use on 64-bit platforms.  Basically, they must reflect
+the word size of the architecture.  All type names are prefixed with a colon.
+
+Since these are rather annoying to use on their own, there are several
+aliases to make life easier.  The values of these are implementation
+dependant, but should always be some "sane" value for the target architecture.
+For instance, on an x86 processor:
+:bool   (uint8)
+:char   (uint8)
+:int    (int32)
+:uint   (uint32)
+:long   (int64)
+:ulong  (uint64)
+:float  (float32)
+:double (float64)
+
+The compound types are arrays, structures, and functions.  Arrays are denoted
+by :#length:whatever, structures have their own type names, and functions
+are written :{:returntype :arg1:arg2...}
+It would be nice if we could omit the first colon, but that would conflict
+nastily with declaring array literals.
+
+Atomic types:
+Atomic types are not composed of anything bigger than individual bits.  They
+include integers, floating-point numbers, booleans, and pointers.  They are
+the parts from which compound types are built.  They can be cast/converted
+from one type to another with the "cast" expression, which returns a value of
+the given type that's as close as possible to the original.
+
+Integers
+Pretty simple.  They come in various sizes, that are basically the sizes
+handled by a given processor.  Each size has two types associated with it, a
+signed integer and an unsigned integer.  For instance:
+:int8
+:uint8
+:int16
+:uint16
+:int32
+:uint32
+:int64
+:uint64
+
+To enable code to be relatively portable, there are several types that can be
+different sizes on different platforms, but must always be something
+"reasonable".  These values are called :int and :uint, which should be the
+word size of the processor or something equally easy to handle, and :long and
+:ulong, which should be larger than int's.  It is STRONGLY SUGGESTED that :int
+be capable of spanning the computer's address space.
+
+Floating-point numbers
+Floats are IEEE floating point numbers.  They are relatively simple, 'cause
+there's only two sizes, 32 and 64 bits.  80-bit floats can be implemented, but
+are not required.  The two types are called :float32 and :float64.  There are
+also portable names, :float and :double.  If you implement 80-bit floats, you
+could have :float be :float64 and :double be :float80 if you want, or :float
+be :float32 and :double be :float80.  Whatever works.  That's why these
+aliases exist.
+
+Pointers
+Pointers are objects that refer to other objects somewhere in memory.  I was
+originally going to do largely without them, but they make life much simpler
+and easier to control, so here they are, 'cause control is the name of the
+game for low-level languages.  A pointer is written :^:foo, where
+foo is the type you want it to point to.  They are used mainly in dynamic
+memory allocation and linked structures.  
+Pointers have to be referenced and de-referenced by hand.  I tried making the
+compiler do this automatically, but it turned out to be such a headache it
+took a year to realize that this was, in fact ambiguous.
+You dereference a pointer thus: (^ foo)
+and you reference an object/get it's address thus: (& foo).
+Yes, this syntax sucks.  I'm open to suggestions on a better way of doing
+things.
+You may only reference VARIABLES, that is, things that have an actual name and
+exist in a certain place in memory.  You can't do, (set foo (& 10)).
+You may dereference just about anything, up to and including the results of
+expressions.  You can do, (set foo (^ (bar))).
+*Note that Sunrise pointers are NOT like C pointers.  You cannot aim them at
+the middle of objects, you cannot do pointer arithmatic, you can cast them to
+utterly wrong types but I really hope you don't because you shouldn't have to.
+If you do, you're probably doing something wrong.  
+*Note that you can cast other values (like integers) to pointers.  Also note
+that unless you're writing an operating system or memory manager, you should
+never have to.  In general, never cast pointer types.  The values pointers
+point to, sure.  If A is a :int8 and B a :^:int32, go ahead and do 
+(set A (cast :int8 (^ B))).  You could even do (set A (cast :int32 B)), which
+would turn B to an int32 and have A point at it.  If you did 
+(set A (cast :^:int32 B)), then it would take B, use it's value as an
+arbitrary address, and have A point at whatever is in that address.  This
+would most likely be utter random junk, and is a surefire way of asking for a
+crash unless you are very brave and know exactly what you're doing.
+*Pointers will not, however, run off the end of arrays or buffers (no pointer
+arithmatic, remember).  They will either have some value, or will be
+initialized to NIL; they will ALWAYS be initialized to something.
+Unfortunately, I have not yet found a way to deal with dangling pointers
+though, pointers to memory that's been de-allocated.  NIL is a special value
+that may be assigned to any pointer; it has no actual "type" of it's own.  You
+should never have a function that returns a pointer to a local value, since
+the stack will almost certainly get stepped on sometime.  The compiler should
+hopefully check for this, though.
+*Basically, pointers can be unsafe.  I've done what I can to make them safer.
+I may do more things in the future, such as having the compiler check to see
+if a pointer leaves the scope of the function while pointing to a local
+object, and making forcing types to and from pointers less... troublesome.
+
+Boolean
+Whew.  Thank gods the pointer section is done with.  Unlike those, booleans
+are exactly what you think: something that can have two states, true and
+false.  In contrast to the rest of the language, it does not matter one bit
+what the size or representation of a boolean is.  If it can be done
+efficiently, make it one single bit.  If not, it will probably be one byte or
+perhaps a whole word.  All that matters is that it has two states, true and
+false.  How those are represented doesn't matter.
+
+Characters
+Characters are ASCII characters.  Once a Unicode library exists, they'll be
+Unicode characters, probably UTF-8 or UTF-16.  They are not numbers.  To treat
+them as numbers, you have to cast them to the appropriate type.
+
+Type conversion
+Type conversion is, unfortunately, necessary.  It is a messy hack, dangerous,
+and generally annoying.  However, since I have more than one or two types of
+number, and since I don't have a univeral and easy way of defining how types
+interact with each other (like an object system, for instance), we need
+explicit type conversion to make life sane.  It's either that or add a bunch
+of infrastructure and complexity with a fancier type system (which may, I
+admit, happen sometime in the future), or a bunch of complexity and headaches
+with loads of implicit and arbitrary rules.  So instead, there's exactly one
+rule:
+If you want to turn one type into another, to assign it or pass it to a
+function or anything, you must tell the compiler so.  You do this with the
+"cast" expression, thus.
+(cast :type-to-convert-to expression)
+That takes the result of expression, turns it into :type-to-convert-to, and
+returns it.  Simple, ne?
+Now, as has been said, only atomic values can be turned from one type to
+another.  As has also been said, doing this with pointers is foolhardy.  Now
+you will be happy to know that turning numbers into other numbers can be done
+in a pretty safe and sane way.
+*Turning signed to unsigned numbers and vice versa does not change the value
+at all.  That means an :int8 with a value of -1 turned into a :uint8 will have
+a value of 255 (on a two's-complement machine).
+*Turning a number from a larger to a smaller type, such as :uint32 to :uint8
+simply truncates the number if it's too large.  Signedness is not preserved.
+*Turning a number from a smaller to a larger type, such as :int8 to :int32
+simply expands the number.  Signedness IS preserved if the destination type is
+signed.
+*Turning floats to integers results in simply truncating the float, such as
+9.9 becoming 9.  Turning integers to floats is simple, 9 becomes 9.0.
+*Turning booleans into any other type is kind of silly, but can be done.  It
+simply returns an integer corrisponding to whatever the internal
+representation of the boolean is.  This is probably going to be 0 if false,
+and 1 or -1 if true, but don't count on it.
+*Okay, one more thing.  Sunrise is not quite strongly typed.  That means if
+you define a type :foo to be an :int, you can take any old :int and assign it
+to a variable of type :foo.  This also means that if you define two different
+structures with the exact same members, you can assign a variable of one type
+to another.  I'm not sure whether this is a bug or a feature yet.
+
+XXX: Numbers can now turn silently from one type to another.  There are three
+general categories: ints, uints, and floats.  Any int or uint will turn into a
+float.  Any int will turn into an int of equal or larger size.  Any uint will
+turn into a uint of equal or larger size.
+
+Compound types:
+Compound types are values that hold other values.  Functions fall under this
+heading, even though they're sorta special.
+
+Arrays
+Arrays are a chunk of contiguous memory cells of a certain size, prefixed with
+a cell containing the size of the array.  This first cell must naturally be
+the size of a pointer on the given architecture.  An array is denoted by a #
+followed by the size of the array and the element type, such as :#10:int.
+Multi-dimensional arrays may be written :#10:#20:int (array of array of int)
+and so on.
+All arrays are fixed-length, and the length of arrays sorta denotes a seperate
+type; an array of length 10 cannot be assigned to an array of length 11.
+There may be ways around this later if necessary.  This can be avoided via
+pointers; pointers can refer to arrays of any length, or can be specialized to
+a fixed length.
+All arrays are bounds-checked, at compile-time if possible.  The length of an
+array is written after the # decleration.  For instance:
+(let (a :#100:int))
+This can be omitted for pointers to arrays, for instance:
+(let (a :^:#:int))
+This lets "a" point to an array of any size, but initializes it to NIL.
+Arrays are all bounds-checked and indexed from 0.  If an index out of the
+range of the array is specified at runtime, the program will halt and print an
+error message (or throw an exception, once I have exceptions).  Yes this is
+inefficient, but eventually the compiler should be able to optimize out most
+of the checks.  Hopefully.  It's more efficient than the alternative however,
+which is allowing all sorts of weird fuckery whenever someone specifies an
+array index of -1.
+Pointers to arrays get a bit weird after a while, 'cause you can end up doing
+things like
+(let (a :#10:int)
+     (b :^:#:int)
+     (c :#20:int))
+(set a whatever)
+(set b a)
+(set c b)
+Which really just isn't sane, and shouldn't be allowed.  It's
+hard-to-impossible to catch at compile time, but a run-time check solves it
+perfectly.  You hear me?  PERFECTLY!
+
+Structures
+Structures are a chunk of memory that contain various fields that may be of
+various size and type.  The order of the fields in memory is unspecified,
+unless someone gives me a good argument why it should be otherwise.  All
+fields of a structure are initialized to the default value of the type.  0 for
+numbers, NIL for pointers, false for booleans.  And if a structure contains
+another structure, the latter structure is also all initialized the same way.
+Structures are defined with the "struct" keyword followed by list of 
+(name :type) statements, thus:
+(struct foo
+   (a :int16)
+   (c :foo))
+
+
+Functions 
+Functions are first-class objects and share a namespace with variables (types
+do not share this namespace).  The type of a function is the type of it's
+arguments and return types.  For instance, the "addf" function might add two
+int's together and return the result as a float, it's type would be
+:{:float :int:int}
+This syntax is handy.  The space after :float is technically unnecessary, but
+helps for clarity.
+
+Strings
+Strings are really just pointers to arrays of characters, that is, :^:#:char.
+Thus they can be any length, and giving the length is unnecessary.  They are
+NOT zero-terminated, because that's really dumb.
+
+Miscellanous things:
+:void is a special type that can ONLY be used in one place: declaring a
+function's return value.  A function with a return value of :void returns
+NOTHING.  Variables, pointers, arrays, structures, and other such things can
+NOT be type :void.
+
+NIL is a special value that's the null pointer; any pointer can refer to NIL.
+NIL may eventually dissapear in the interests of safety, so that every
+variable always refers to something valid, but right now the type system
+isn't cool enough to make the non-existance of NIL simple.
+
+Tentative and unimplemented
+or,
+These don't exist, and may never:
+Pointers may not refer to objects on the stack, or may not have objects on the
+stack assigned to them if the pointer exits the local scope.  Basically, the
+goal is to not let pointers be passed to a function and have a local value
+assigned to them, or have a local value assigned to them and then be returned.
+This will prevent the stack from being clobbered by code like:
+void foo( int *a )
+{
+   int b = 10;
+   *a = b;
+}
+If a function calls foo(), then calls some other function, the value pointed
+to by *a would be utterly scrambled, mangled, and overall demented in
+unpredictable ways.  We don't want that to happen.
+The ^+ and ^- operations are used for pointer arithmatic.  
+An integer may not be assigned to a pointer; it must be converted to one via a
+function.  This is to maintain compatability on segmented architectures (hey,
+they may be big again in 10 years).
+I'm considering making something like Modula-2's "addresses": an arbitrary,
+untyped location in memory that can be literally anything, but which
+automatically marks anything that touches it as unsafe.
+
+VARIABLES
+Okay.  No nice abstraction here; this is the down-and-dirty.  A variable or
+constant of any kind is just a chunk of memory sitting somewhere.  Apart from
+type information that the compiler presents to make you think the computer
+cares about such things, something important to be aware of is exactly WHERE
+in memories such things sit.
+Note that this can be modified on systems with a radically different memory
+model, such as stack machines or embedded systems.  However, it should
+hopefully work just about the same way for the programmer.
+
+There are two types of variables: atomic variables, which are numbers,
+pointers and so on, and compound variables, which are arrays or structures
+made of one or more atomic or compound variable.
+
+Variables are always initialized.  If no value is given, they're initialized
+to 0, false, NIL, whatever.  Structures and arrays have their elements initialized to whatever the default is.
+This is not inefficient.  If a variable is assigned to before something reads
+it, the compiler should often be able to detect it and optimize appropriately.
+It doesn't have to, but it'd be nice.
+
+Variables can reside in three places in memory.  Globals and constants are
+simply placed in the program's data segment, and are declared thus:
+(global name type [default value])
+(const name type value)
+
+Other variables are bound inside functions using the "let" decleration, which
+allocates stuff on the stack.  They're created when the function is entered
+and destroyed when the function returns.  The values themselves can be
+returned (they are copied by value), but pointers to them should not be.  The
+compiler should check for this if possible.
+(XXX: I may simply disallow pointers to local variables entirely, see previous
+chapter)
+
+
+The syntax of let is thus:
+(let (<varname> <vartype> <defaultvalue>) ...)
+So you could write:
+(let (a :int 0)
+     (b :float 99.0))
+or
+(let (a :^:int NIL)
+     (b :#6:bool {true, false, true, true, true, false}))
+
+
+STATEMENTS
+All statements are of the form (statement arg arg ...).  Yes, like Lisp.  Yes,
+for a systems-programming language.  It solves a lot of problems, okay?  Like
+95% of operator precedence and parsing in general.  Deal with it.  It's not
+exactly hard to work out.  If you don't like it, take two days and write a
+preprocessor.
+A statement does NOT return a value, an expression DOES.  That is the only
+difference.  The parser doesn't know this difference; they both look exactly
+the same, so it doesn't matter.  I hope to make most things expressions if
+possible and reasonable.
+
+Function decleration
+(def name type (name type ...) body ...)
+Declares a function called "name" with a return type "type", that takes the
+given arguments.  The result of the last statement in the function body is
+automatically returned, or ignored if no return type is given.
+Function definitions can be nested.
+
+Variable decleration
+We've been over this.  Globals and consts cannot be defined IN functions, let
+cannot be used OUT of functions.
+(let (varname type [default value]) ...)
+(global varname type [default value])
+(const varname type value)
+
+While
+Basic iteration.
+(while expression body ...)
+Executes the body as long as the expression remains true.
+
+(XXX: Not implemented yet!)
+For 
+(for name startval endval incr body ...)
+Creates a variable called "name", initializes it with "startval", and until it
+equals "endval" executes the body, then the "incr" statement.
+Or rather...
+(for name startexp endexp increxp body ...)
+Equal to:
+(let (:int name))
+(while endexp
+   startexp body increxp)
+...hmm, the (let) is a bit of a kludge, and not always necessary.  But it
+WOULD be nice if we didn't need to pre-declare the var.  But that'd require
+being able to declare a var as an expression.
+
+(XXX: Not implemented yet!)
+From
+(from name startval endval incval body ...)
+Creates an int var named "name", and sets it to "startval".  Then it loops,
+executing the body and then adding the "incval" to "name" until it reaches
+"endval".
+(let (:int name startval)
+(while (/= name endval)
+   body
+   (set name (+ name incval)))
+
+
+(XXX: Not implemented yet!)
+Asm
+(asm ...)
+This lets you cut down straight into assembly.  There is no standard for how
+it works so far, only that it must.  You can just accept raw strings and
+assume they're assembly if you want, deferring any error to the assembler.
+You can implement a fancy macro-assembler right in the compiler if you really
+want.  There should probably be a standard syntax for this on each platform/
+architecture.  I'm not an expert on this though, so.
+
+
+Note that there is no "break", "return" or "continue" statement.  There are
+very few times when you truely strictly need one.  Right now we're keeping
+life simple.  Use recursion and tail-call optimization.
+
+
+SCOPE
+Pretty familiar block-structured model.  Only functions and "do"'s create a
+new scope; while loops and such do not.  Variable decleration statements can
+be put anywhere, and the variable exists from the declared point to the end of
+the enclosing block.  Any variables with the same name as one in an enclosing
+block will shadow that variable until the block ends.  Note that closures can
+NOT be made, and should be a compile-time error!  To non-functional-language
+buffs, this means that if you define a function B inside function A, and B
+refers to some of A's variables, A cannot return B.  In fact, I'm not even
+sure if A can call another function with B as an argument in such a case.
+Closures would be nice, but they require memory infrastructure that'd make
+things inconvenient.
+
+
+EXPRESSIONS
+Assignment
+(set var value)
+Sets "var" to "value".  They must be the same type, or compatible types.  If
+var is a reference, it now points to value; value is NOT copied.  If var is a
+pointer, it now points to whatever value pointed at.  It returns the value of
+"var".
+
+Arithmatic
+You can guess what these do, I'm sure.  Note that there's no limit to the
+number of arguments that can be given; they are simply applied to each other
+left-to-right.  (/ 10 20 30) is 10 / 20 / 30.  They work on any kind of
+number, and return a number of the same type; all arguments must be of the
+same type.  (XXX: I may make some sort of number-inference rules later, don't
+worry).
+(+ expr expr ...)
+(- expr expr ...)
+(* expr expr ...)
+(/ expr expr ...)
+(% expr expr ...)
+
+Logic
+These accept and return values of type "bool".  Numbers and NIL are not
+boolean values.
+These use short-circuit evaluation where possible.  In (and false (set a 10))
+the assignment will not be performed (this isn't valid anyway, since
+assignment isn't an expression, but still (the parser will accept it, the type
+checker will croak)).
+(and expr expr ...)
+(or expr expr ...)
+(not expr)
+(xor expr expr ...)
+
+There are also binary operators that will take any atomic value and return the
+same type with the appropriate bitwise operation performed on it.
+(band expr expr ...)
+(bor expr expr ...)
+(bnot expr)
+(bxor expr expr ...)
+
+Relational operators
+These accept any two numbers and return a bool, even if the numbers are of
+different type.
+Note that = will also compare pointers and references, and return true if they
+are the same.
+There should eventually be == and /== operators that recursively compare
+arbitrary structures, but that's kinda hard, so we'll leave it till later.
+(= expr expr ...)
+(/= expr expr ...)
+(< expr expr ...)
+(> expr expr ...)
+(<= expr expr ...)
+(>= expr expr ...)
+
+Do
+(do body ...)
+Executes all the statements in body and returns the value of the last
+expression.  Useful mainly in "if"'s and so on.  It declares it's own scope.
+(XXX: Does it, now?)
+
+Function calls
+A function call looks like just about everything else:
+(funname arg1 arg2 ...)
+
+If
+This is just like Lisp's if:
+(if expr arg1 [arg2])
+It evaluates expr and if it's true, executes arg1 and returns the result.  If
+it's false, it executes arg2 and returns the result, if it exists.  If arg2
+doesn't exist, the if statement returns :void if expr is false.
+
+Array references
+Arrays are always indexed from 0 to whatever.
+Referring to an array element is done with the following syntax:
+array#element
+In a multiple-dimension array it's simply:
+array#element#element...
+
+Both the array and element can be either a constant or an expression.  For
+instance: 
+(function_returning_an_array)#(+ 5 3)
+
+It is an error to refer to an array item that does not exist, or to a negative
+item.  The compiler inserts bounds-checking for these cases, then should do
+all it can to optimize it out.  It is permitted for the compiler to have a
+switch to turn off bounds-checking, but doing so is not recommended.
+
+Structure references
+Elementes of a structure are referred to thus:
+structure.element
+If element is another structure, it can be repeated:
+structure.substructure.element ...
+and so on.
+
+Bitwise Expressions
+Pretty basic at the moment:
+(<< foo 10)   // Shifts foo left 10 bits
+(>> bar 20)   // Shifts bar right 20 bits
+
+
+FUNCTIONS
+If you've been paying attention, you know how they're defined, you know how
+they're called.  What more do you need?
+Okay.  Functions can be nested, but they can't be closures, static or dynamic.
+Just doesn't work well without garbage collection.  Each function can mess
+with the local variables of the functions it's nested in, but the compiler
+should not allow such a function to be returned.
+The function's return value is the value of the last expression in the
+function.  If a function's return type is :void, it returns nothing.  If a
+function ends with a statement such as assignment, loop, or something like
+that that doesn't produce a value, it must return :void.
+Functions are just values like anything else.  They are really always refered
+to through pointers, but we hide that from the user.
+You can do something like this: 
+(def bar:int (a:int b:int)
+   (+ a b))
+...
+(def main:int ()
+   (let (foo :{:int :int:int} bar))
+   (foo 10 20)))  // Same as just calling (bar 10 20)
+
+
+ERROR HANDLING
+There is none.  There should be a proper exception handling system later.
+
+MEMORY MODEL
+This is mostly already described in the "Variables" section.
+There are currently no facilities for dynamic memory allocation.  Something
+else that will be put in later.  The hard part is making it so one can swap
+allocators in and out, and rigging the type system to play nice with it, which
+isn't currently possible.  It should be once we get parametric polymorphism.
+
+MODULES AND COMPILATION
+This works however the compiler and linker want it to.  There are no modules
+or namespaces.
+This will change later.
+
+LOW-LEVEL JUNK
+I can't really remember what I wanted to mention here...
+
+STANDARD LIBRARY
+Nope, none again.  Just the core language.
+
+NOTES
+In case you hadn't noticed, right now I'm only worried about the basic, core
+functionality.  Frills will come later.  And knowing me, "frills" will
+probably be anything up to and including a database-driven source-management
+system, graphics tools, and an operating system.
+
+SPECIAL THANKS
+Atma, for encouraging me despite my better judgement
+The people who wrote Bit-C, 'cause it's interesting
+The people who wrote OCaml, 'cause it's an awsome language
+The people who wrote Modula-3, 'cause it's inspiring.
+Everyone and everything who ever inspired me
+
+
+TODO:
+In general:
+Proper tail recursion
+More flexible iteration structures (for, foreach, etc)
+More flexible logic structures (cond, case)
+Parametric polymorphism
+Exception system
+Memory allocator specification (regions?)
+Standard library spec (check out Ocaml, ObjC, Modula2/3, Python/Ruby/Perl)
+Assembler specification (GCC?)
+Module system
+Union-structures and pattern matching a la OCaml.
+
+Specific goals for next revision:
+Module system
+Memory allocator specification (regions?)
+Parametric polymorphism
+Proper tail recursion
+More flexible iteration structures (for, foreach, etc)
+
+
+
+
+FFI: an extern-c and maybe extern-ocaml fundef statement would be nice.
+
+There should be a "create" expression that calls the memory allocator function
+with region/objsize, coerces the memory to the specified type, and initializes
+it.  The problem is the "coercing to the specified type", since that really
+can't be done at all currently.  It'll be trivial once I do polymorphism
+though.
+Well, not really, it'll take some syntactic support no matter what to find out
+how big an area it should allocate.  This'd be trivial with a sizeof operator,
+but that's messy to actually use.  For once I want macros.
+Basically, our choices are thus: Make a sizeof operator and have it be ugly to
+use but able to easily refit the memory system, or add syntactic support for a
+certain type of memory system but have it inflexible.
+...Do both.  If they want to write their own memory system, they use sizeof.
+If they use the default in-built one, the syntax supports it nicely.
+XXX: Initialization!  How does it work???  I mean, for stack structures it can
+be done easily, but for dynamically allocated structures?  The compiler has no
+idea what structure is going to be created when at runtime!  This means that
+the allocator will need to initialize the structure itself...
+The obvious way around this is to have the compiler generate an initialization
+function for each struct.  Allocating a struct will compile to allocate and
+initialize.
+...that's kinda messy though.  Maybe we make an initialization function
+automatically, but don't call it automatically?
+Maybe for each struct, we have a global struct of the same type that's the
+default values.  Then whenever we make a new struct, we copy the values from
+that type.  That's cleaner; it requires compiler support, but can be gotten
+around it.
+...ooooooh.  We pass this prototypical struct to the allocation function.
+That gives that function the SIZE of the struct, as well as the default
+values!  W00t!  We win, for a little bit of memory overhead!  And we can make
+a sizeof operator too!
+...that's rather memory-inefficient, though.  Bloat.  It might be preferable
+to just do sizeof, and scrap initializations and just init everything to
+0/NIL.
+
+
+Internal naming convention for packages, functions, and inner functions.
+The syntax for symbols (names, variables, types, etc) goes package_symbol.  If
+an underscore occurs in a symbol, it is escaped as a double-underscore (so
+Foo_bar.do_stuff's symbol is Foo__bar_do__stuff).  This is because linkers and
+assemblers are weird-ass creatures that don't always support alphanumeric
+characters aside from an underscore.  Stupid them.
+
+Package system: Sorta modula-ish.  At the beginning of each file (which is the
+same as a module), you declare what values and functions it exports (types, I
+am really not sure about, since they're not first-class objects).
+(export (foo :int) (bar :float) (bop :{:int :float}))
+Or maybe just
+(export foo bar bop)
+and let the compiler handle it more smartly.
+When the file is compiled into a .o file, what it exports and so on are all
+dumped into a .sri file.  I'm not sure how you make a library, but I'll
+probably have to write some custom tools for it.  Maybe it just concatenates
+all the .sri files into a new one.  .sri files contain what packages they
+depend on.  I don't want to have to mess with a linker to customize it to deal
+with this directly, but an idea would be to output an ld script or fragment of
+one that contains all the package dependancy information...  Or a front-end
+that computes the package dependancies and calls the linker appropriately.
+Then, to use this package, you write:
+(import pkgname)
+which lets you use the values in the package in the form pkgname::symbol.  Or
+maybe pkgname.symbol or pkgname!symbol, whatever I decide in the end.  Or you
+can do
+(import pkgname foo bar bop)
+which lets you refer to foo, bar, and bop without the pkgname part, and I may
+let you do
+(import pkgname *)
+which does the same for all symbols.
+Packages are not nested like Java, they are flat like OCaml.  If a imports b
+and c imports a, c does not have access to b unless it also imports it.  If a
+depends on b and b depends on a, they should be able to compile fine; the
+compiler checks the imports and exports on both, makes sure they match, then
+compiles 'em (XXX: this may change if it's too hard, but naming specific items
+like in Modula-2 might work nicely).  
+The compiler HAS to import types as well.  Darn it, that makes life more
+complicated.  Oh well...  it can be done.
+
+Parametric polymorphism:  The function that takes a polymorphic arg really
+takes a pointer to an object (unless the value fits within a pointer...).  It
+can then assign it to anything of the same type and pass it to other
+polymorphic functions, and that's about it.  If it returns a polymorphic
+value, it returns a pointer, and the calling function knows it.
+
+Maybe naked pointers, that can point to anything?  Or, better yet, an
+"address" type that can have arithmatic done on it, can be casted to a pointer
+of whatever type...
+
+
+CATEGORIES TO FOCUS ON IMPROVING:
+Type system
+*Parametric polymorphism
+*Object system
+*Tagged union/enum types
+*Range types?
+*Integration with exceptions
+*Declaring struct values (constructors is the word, a la OCaml, C99, etc)
+*Variable length arguments
+*Pointer safety in general; look up stuff about C, dangling pointers, and wild
+pointers on Wikipedia.
+*Should we just ditch unsigned ints?  Or most of them, at least, just having a
+"word" type?  Man that'd be nice...
+*Distinguishing between pointers (references) and addresses?
+*Get rid of Nil
+
+Library
+*Look at C, Python, Ruby, Java, C++, OCaml, Smalltalk, D, Ada, M2/M3/Oberon,
+ Eiffel, Lisp, Obj-C
+*Old ideas also.  Dancer, Song
+*Unix interface
+*FFI
+*Unicode
+*Heavyweight strings w/ efficient and powerful operations --ropes
+*OCamlish Option type to indicate failure?  Put language support in if so...
+*YAML
+*Heavyweight math -bignums, complex nums, ratios, etc.
+
+Package system
+*Definition of packages
+*Filesystem interface
+*Seperation of interface and implementation
+*Look at Python, Java, Modula, Eiffel plus Ruby and Perl just for fun
+
+Syntactic sugar
+*case
+*cond
+*for
+*foreach/from
+*asm syntax and passing arguments
+*Default and named function arguments
+
+Exception system
+*Try/catch/finally
+*Take a look at the real ideas and principles of it (ie Lisp, other systems
+like C#, Java, Eiffel, OCaml, Haskell)
+
+Memory management
+*Regions vs. malloc. Check out RC for regions, flim and gdc for gcc interface.
+Notes in ~/src/lang
+*Syntactic forms if necessary --alloc, sizeof
+*Each type has an array of words holding the default values?
+*String literals are immutable?
+
+Misc
+*Should one be able to get at overflow and carry registers?  Perhaps through a
+library?
+*Be able to type out struct constants?  But different structs can have
+identical members, unlike OCaml...
+*What would happen if we made pointers read-only, like ML vars?  How would
+that changes semantics, correctness, speed, and memory patterns?  ...ah, but
+would you still be able to alter the contents of, say, a pointer to an array?
+*Floating point +Inf, -Inf, NaN, etc
+
+(The above are design issues; the below are implementation issues)
+Optimization
+*Tail-recursion
+*Constant folding
+*Optimization in general
+*Be able to specify inline funcs?
+*Optimizer directives in source file?
+
+Debugging
+*Output debugger information
+*Be able to perform compilation statistics: speed, length of code, etc 
+*Improve error reporting in general; include line numbers in syntax tree
+*Perhaps work out some unified system for run-time controls: being able to
+enable and disable warnings for various run-time checks, controlling which
+run-time checks are performed, enabling code-tracing, dumping arbitrary data
+*Some kind of memory-error-detection system should exist... a compile-time
+option in the allocator lib?  Having debugging turned on or off could toggle
+it.

@@ -1,0 +1,13 @@
+#!/bin/sh
+
+FILES="errorReport.ml syntree.ml parse.mli parse.ml lex.ml \
+       sizes.ml symtbl.ml semant.ml main.ml"
+
+OCAMLYACC=ocamlyacc
+OCAMLLEX=ocamllex
+OCAMLC=ocamlc.opt   # Change to ocamlc for bytecode
+
+$OCAMLYACC -v *.mly
+$OCAMLLEX *.mll
+$OCAMLC -c -g $FILES
+

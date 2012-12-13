@@ -1,0 +1,252 @@
+; test.sr
+; This is the sorta "definition" file...  made to test the Sunrise compiler.
+; If a type of statement is in here, it's valid Sunrise.
+; If the parser accepts some syntax that isn't in here, it shouldn't.
+;
+; Simon Heath
+; 30/3/2005
+
+/-  We can also do block comments!
+/-  Even nested ones!  -/
+    Gods only know why C doesn't allow that; it's dead easy to handle at the
+    lexing phase, truely.  Stupid junk...  That has to be the most brain-dead
+    decision ever made by the Digital Mars D people, too.
+-/
+
+; Constant and global declerations
+(const A :int 10)
+(const B :#3:int {10 20 30})
+(global b :char 'a')
+(global c :uint (cast :uint 0x90))
+
+(global bah :#10:int {0 0 0 0 0 0 0 0 0 0})
+;(global wah :^:^:^:^:#:int {10 30})
+(global e :#1:int {10})
+(global d :^:#3:int {10 0b1010 0o36})
+(global f :#4:int)
+
+; XXX: Does this work?
+(def a1 :{:int} ()
+   (def b1 :int () 10)
+   b1)
+
+; What about this?
+(def a2 :{:int} ()
+   (let (a :int))
+   (def b1 :int () a)
+   b1)
+
+; XXX: ...um...  damn?
+(const C :int D)
+(global D :int C)
+
+; Structure declerations
+(type foo :testStruct)
+
+(struct testStruct
+   (d :uint)
+   (c :^:testStruct)
+   (a :^:int) ; XXX!  This should maybe actually work!  At least for consts.
+   (g :^:foo)  ; Indirect recursive type.
+   (b :int))
+
+; Type declerations
+(type testArray1 :#:int)
+(type testArray2 :#:#:int)
+(type testPointer1 :^:int)
+(type testPointer2 :^:^:int)
+(type testArrayPointer :#5:^:int)
+(type testPointerArray :^:#:int)
+(type testPointerArray2 :^:#3:int)
+(type testFixedArray :#1:int)
+(type testFunc :{:int :int})
+(type testType :testArray1)
+; These three are examples of errors --duped name, nonexistant or void type.
+;(type testType :testArray1)
+;(type testType2 :typeDNE)
+;(type testType3 :void)
+
+; Make sure (type foo :foo) or (type foo :^:foo) doesn't loop
+; (type fooFunc :{:fooFunc}) should be able to work, maybe.
+; Does the concept of that actually jibe?  A function that returns
+; a function of the same type...  Maybe.
+;(type fooFunc :{:fooFunc :int})
+
+; This works... whild.
+(struct fooThing
+   (thing :{:fooThing}))
+
+(global testArray1 :testPointerArray)
+(global testArray2 :testFixedArray {10})
+(global testArray3 :testArrayPointer {10 20 30 40 50})
+
+
+
+(def foofunc :int (a :int b :char c :testFixedArray)
+   (set a 12)
+   a)
+
+(def barfunc :int ()
+   (let (a :int) (b :int) (c :double))
+   (let (d :#3:int)) ; {10 30 50}))
+   ;(let (e :^:#:int))             ; (& {10})))
+   (let (f :testFixedArray)) ; {10}))
+   (set d {10 20 30})
+   ;(set e d)
+   ;(set d e)   ; This should create a runtime error -lengths are diff!!!
+   ;(let (q :^:int (& A)))
+   (+ 10 (cast :int c))
+
+   ; XXX: Hey, what's with this?
+   (set c (+ 10 95.1))
+   ;(set a 95.1)
+
+   (def testfunc :int (a :int) (+ a 10))
+   (testfunc 20)
+   ;(let (h :{:int :int}))
+   ; XXX: 
+   (foofunc 10 'c' {10}))   ; (cast :^:char c)))
+
+/-
+; Function declerations
+(def bopfunc :bool (a :int b :int)
+   (xor true false))
+
+(def blehfunc :void ()
+   (bopfunc 10 20))
+
+(struct foop
+   (a :int)
+   (b :char))
+
+(struct barp
+   (a :int)
+   (b :char))
+
+(def beepfunc :void (a :int b :int)
+   (+ a b))
+
+(def grar :int (a :int)
+   (let (b :int) (c :float) (d :double) (e :long))
+   (set e a)
+   (+ a 5))
+
+; Functions as values
+(def ffunc :{:bool :int:int} (a :{:void :char})
+   (let (b :testFunc grar))
+   (a 'a')
+   ; Assign a :{:int :int} to a :testFunc, and hey, it works!
+   (set b grar)
+   bopfunc)
+
+(def quuxfunc :char ()
+   (let (a :testStruct))
+   (let (b :^:long))
+   ; Forces whatever b points to, to a char.
+   (cast :char b))
+
+(def ptrcoercetest :long ()
+   (let (b :long))
+   (let (c :^:long))
+   (set c (& b))
+   (set b (^ c))
+   (set c (cast :^:int c))
+   (set c NIL)
+   ;(set NIL c)  Syntax error, baby!  NIL is not an lvalue!
+   (let (d :^:^:long))
+   (set b (^ (^ d)))
+   (set (^ d) (& b))
+   (set c (^ d))
+   (set d (& c))
+   d)
+(def numcoercetest :long ()
+   (let (a :int64 (cast :int8 (+ 0 95.1)))
+        (q :float64)
+        (r :^:int NIL)
+        (b :int32)
+	(c :int32)
+	(d :int64)
+	;(ua :uint8)
+	;(ub :uint16)
+	;(uc :uint32)
+	;(ud :uint64)
+	(fa :float32)
+	(fb :float64))
+   (set b (cast :int32 a))
+   10)
+
+/-
+; Test miscellanious functionality
+(def bopfunc :void ()
+   ; Declare local vars
+   (let (a :int)
+        (b :str "10")
+	(c :testStruct))
+   (local (d :char)
+          (e :^:int32))
+	  
+   ; Declare local function
+   (def inner_func :void ()
+      (if (< a e)
+         a
+	 e))
+	 
+   ; Check function calls, arrays, structure refs, pointers, strings,
+   ; and various permutations thereof all work.
+   (funcall a b).foo.bar.bop
+   (inner_func)
+   (arraytestfunc 10)#5
+   (arraytestfunc 10)#(a)
+   ^e
+   ; XXX: double-check how these work!
+   (foofunc ^a#foo#bar)
+   (foofunc ^(a#foo#bar))
+   (foofunc (^a)#foo#bar)
+   (foofunc a#^foo#bar)
+   "foo"
+   "bar"
+   "bo\tp"
+   ; Array literals
+   {12 20}
+   (set a {10 20 30}))
+
+
+; Test different kinds of expressions
+(def exprtest :void ()
+   ; funcall
+   (bopfunc 10 20)
+   ; if
+   (if a b)
+   ; if/else
+   (if a b c)
+   ; do
+   (do
+      ; while
+      (while (foo) (bar) (bop) (beep))
+      ; Assignment, math
+      (set a (+ 10 (- 20 (* 30 (/ 40 (% 50 60 80))))))
+      (set a#b 30)
+      (set ^b 30)
+      (set b.c 30))
+   ; Comparison...  (>= 60 70 80) is (60 >= 70 >= 80)
+   (= 10 (/= 20 (< 30 (> 40 (<= 50 (>= 60 70 80))))))
+   ; Logic
+   (and a (or b (xor c (not d))))
+   ; binary operations
+   (band a (bor b (bxor c (bnot d))))
+   (<< a 10)
+   (>> b 20))
+
+; Type: {{:int int} {:int {:void :int:int}}}
+; Takes a function of type :int {:void :int:int} and returns
+; a function of type {:int :int}
+(def functest3 {:int :int} (a {:int {:void :int:int}})
+   10)
+
+; Type: {{:int :int} {:int} {:void :int:int}}
+; Returns a function of type :int :int, takes two functions, one of type
+; :int and the other of type :void :int:int
+(def functest4 {:int :int} (a {:int} b {:void :int:int})
+   10)
+-/
+-/

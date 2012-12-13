@@ -1,0 +1,7 @@
+Informal changelog:
+Version 1: Beginning
+Version 2: Removed all the crap about implicit references, changed it to
+explicit but auto-referencing pointers.  Simplified the type system some.
+Version 3: Removed default values, made everything default to 0 or NIL.
+Version 4: Removed auto-dereferencing values
+Version 5: Started the type system over from scratch, using only int and float
